@@ -14,7 +14,7 @@ from datetime import datetime
 bl_info = {
     "name": "Mars Rover NAVCAM Import",
     "author": "Rob Haarsma (rob@captainvideo.nl)",
-    "version": (0, 1, 2),
+    "version": (0, 1, 3),
     "blender": (2, 7, 1),
     "location": "File > Import > Mars Rover NAVCAM Import  and/or   Tools menu > Misc > Mars Rover NAVCAM Import",
     "description": "Creates textured meshes of Martian surfaces from Mars Rover Navcam image products",
@@ -95,7 +95,7 @@ def ReadNavcamString(inString, inFillBool):
             roverImageDir = 'msl/MSLNAV_1XXX/EXTRAS/FULL/'
 
         sol_ref = tosol(rover, theString)
-        print( '\nConstructing image %d/%d, sol %d, name %s' %( i + 1, len(collString), sol_ref, theString) )
+        print( '\nConstructing mesh %d/%d, sol %d, name %s' %( i + 1, len(collString), sol_ref, theString) )
         
         image_texture_filename = get_texture_image(rover, sol_ref, theString)
         if (image_texture_filename == None):
@@ -129,12 +129,14 @@ def SetRenderSettings():
 def download_file(url):
     global localfile
 
+    proper_url = url.replace('\\','/')
+    
     try:
-        page = request.urlopen(url)
+        page = request.urlopen(proper_url)
         if page.getcode() is not 200:
             #print('Tried to download data from %s and got http response code %s', url, str(page.getcode()))
             return False
-        request.urlretrieve(url, localfile)
+        request.urlretrieve(proper_url, localfile)
         return True
     except:
         return False
@@ -464,7 +466,7 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
     
     #simple dehole (bridge)
     #max_fill_length = fill_length
-    max_fill_length = 0.4
+    max_fill_length = 0.6
     if(do_fill):       
         for j in range(0, LINES-1):
             for k in range(0, LINE_SAMPLES-1):
