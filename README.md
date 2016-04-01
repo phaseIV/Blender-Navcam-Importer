@@ -5,7 +5,7 @@ Addon for Blender that creates Martian surfaces from Mars Rover NAVCAM images.
 
 See a movie here: https://vimeo.com/160405895
 
-## Instructions
+## Installation
 Download the python script and install as addon in Blender’s Preference panel. Enable it.
 Select the addon from the Import Menu (File > Import) or from the Misc tab in the Tools menu.
 
@@ -20,7 +20,7 @@ Note that this process takes a while and Blender is unresponsive during executio
 
 The resulting mesh, which is in no way scientifically accurate, can contain over a million vertices and will have gaps and glitches. For artistic purposes this addon provides an option to fill small gaps.
 
-Check this [page](https://github.com/phaseIV/Blender-Navcam-Importer/wiki/Instructions) for instructions about obtaining Navcam images.
+Check this [page](https://github.com/phaseIV/Blender-Navcam-Importer/wiki/Instructions) for further instructions.
 
 ## Notes
 The addon caches all downloaded data in Blender’s Temp directory. Texture images will get packed in the Blend file.
