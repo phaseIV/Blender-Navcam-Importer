@@ -616,7 +616,12 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
         
     # Create Credit text
     trover = [ 'Spirit', 'Opportunity', 'Curiosity' ]
-    date_object = datetime.strptime(creation_date, '%Y-%m-%dT%H:%M:%S.%f')
+
+    if creation_date.startswith( '\"' ):
+        date_object = datetime.strptime(creation_date[1:23], '%Y-%m-%dT%H:%M:%S.%f')
+    else:
+        date_object = datetime.strptime(creation_date[0:22], '%Y-%m-%dT%H:%M:%S.%f')
+
 
     # MSL provides Right Navcam Depth data
     s = list(os.path.basename(image_texture_filename))
