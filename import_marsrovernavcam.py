@@ -14,9 +14,9 @@ from datetime import datetime
 bl_info = {
     "name": "Mars Rover NAVCAM Import",
     "author": "Rob Haarsma (rob@captainvideo.nl)",
-    "version": (0, 1, 3),
+    "version": (0, 1, 4),
     "blender": (2, 7, 1),
-    "location": "File > Import > Mars Rover NAVCAM Import  and/or   Tools menu > Misc > Mars Rover NAVCAM Import",
+    "location": "File > Import > ...  and/or  Tools menu > Misc > Mars Rover NAVCAM Import",
     "description": "Creates textured meshes of Martian surfaces from Mars Rover Navcam image products",
     "warning": "This script produces high poly meshes and saves downloaded data in Temp directory",
     "wiki_url": "https://github.com/phaseIV/Blender-Navcam-Importer",
@@ -76,6 +76,8 @@ def ReadNavcamString(inString, inFillBool):
             popup_error = 3
             bpy.context.window_manager.popup_menu(draw, title="Name Error", icon='ERROR')
             return
+
+        rover = None
    
         if theString.startswith( 'N' ):
             rover = 3
@@ -84,6 +86,11 @@ def ReadNavcamString(inString, inFillBool):
         if theString.startswith( '1N' ):
             rover = 2
         
+        if rover == None:
+            popup_error = 4
+            bpy.context.window_manager.popup_menu(draw, title="Name Error", icon='ERROR')
+            return
+
         if rover == 1:
             roverDataDir = 'mer/mer2no_0xxx/data/'
             roverImageDir = 'mer/gallery/all/2/n/'
@@ -622,7 +629,6 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
     else:
         date_object = datetime.strptime(creation_date[0:22], '%Y-%m-%dT%H:%M:%S.%f')
 
-
     # MSL provides Right Navcam Depth data
     s = list(os.path.basename(image_texture_filename))
     if rover == 2 or rover == 1:
@@ -706,6 +712,10 @@ def draw(self, context):
     if(popup_error == 3):
         self.layout.label("Navcam imagename has incorrect length.")
         print("Navcam imagename has incorrect length.")
+
+    if(popup_error == 4):
+        self.layout.label("Not a valid Left Navcam imagename.")
+        print("Not a valid Left Navcam imagename.")
 
 
 class NavcamToolsPanel(bpy.types.Panel):
