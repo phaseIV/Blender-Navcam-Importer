@@ -1,14 +1,18 @@
-import bpy
 import os
+import re
 import math
+import time
+import struct
+from urllib import request
+from datetime import datetime
+
 import mathutils
 from mathutils import Vector, Quaternion
-import struct
+import pvl
+
+import bpy
 import bmesh
-from urllib import request
-import time
-import re
-from datetime import datetime
+
 
 
 bl_info = {
@@ -362,116 +366,36 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename,
 
     print('creating mesh...')
 
-    # Open the img label file (ascii label part)
     try:
         if FileAndExt[1].isupper():
             f = open(FileAndExt[0] + ".IMG", 'r')
+            label = pvl.load(FileAndExt[0] + ".IMG")
         else:
             f = open(FileAndExt[0] + ".img", 'r')
+            label = pvl.load(FileAndExt[0] + ".img")
     except:
         return
 
-    block = ""
-    OFFSET = 0
-    for line in f:
-        if line.strip() == "END":
-            break
-        tmp = line.split("=")
-        if tmp[0].strip() == "OBJECT" and tmp[1].strip() == "IMAGE":
-            block = "IMAGE"
-        elif tmp[0].strip() == "END_OBJECT" and tmp[1].strip() == "IMAGE":
-            block = ""
-        if tmp[0].strip() == "OBJECT" and tmp[1].strip() == "IMAGE_HEADER":
-            block = "IMAGE_HEADER"
-        elif tmp[0].strip() == "END_OBJECT" and tmp[1].strip() == "IMAGE_HEADER":
-            block = ""
-        if tmp[0].strip() == "GROUP" and tmp[1].strip() == "GEOMETRIC_CAMERA_MODEL":
-            block = "GEOMETRIC_CAMERA_MODEL"
-        elif tmp[0].strip() == "END_GROUP" and tmp[1].strip() == "GEOMETRIC_CAMERA_MODEL":
-            block = ""
-        if tmp[0].strip() == "GROUP" and tmp[1].strip() == "ROVER_COORDINATE_SYSTEM":
-            block = "ROVER_COORDINATE_SYSTEM"
-        elif tmp[0].strip() == "END_GROUP" and tmp[1].strip() == "ROVER_COORDINATE_SYSTEM":
-            block = ""
+    creation_date = label['START_TIME'].strftime("%Y-%m-%dT%H:%M:%S.%f")
+    LINES = label['IMAGE']['LINES']
+    LINE_SAMPLES = label['IMAGE']['LINE_SAMPLES']
+    SAMPLE_TYPE = label['IMAGE']['SAMPLE_TYPE']
+    SAMPLE_BITS = label['IMAGE']['SAMPLE_BITS']
+    BYTES = label['IMAGE_HEADER']['BYTES']
 
-        elif tmp[0].strip() == "START_TIME":
-            creation_date = str(tmp[1].strip())
+    osv = label['ROVER_COORDINATE_SYSTEM']['ORIGIN_OFFSET_VECTOR']
+    # GODBER TODO: Understand why these are different, must be
+    # different covention
+    bRoverVec[:] = osv[1], osv[0], -osv[2]
+    bRoverQuad[:] = label['ROVER_COORDINATE_SYSTEM']['ORIGIN_ROTATION_QUATERNION']
+    mc1 = label['GEOMETRIC_CAMERA_MODEL']['MODEL_COMPONENT_1']
+    bCam[:] = mc1[1], mc1[0], - mc1[2]
 
-        if block == "IMAGE":
-            if line.find("LINES") != -1 and not(line.startswith("/*")):
-                tmp = line.split("=")
-                LINES = int(tmp[1].strip())
-            elif line.find("LINE_SAMPLES") != -1 and not(line.startswith("/*")):
-                tmp = line.split("=")
-                LINE_SAMPLES = int(tmp[1].strip())
-            elif line.find("UNIT") != -1 and not(line.startswith("/*")):
-                tmp = line.split("=")
-                UNIT = tmp[1].strip()
-            elif line.find("SAMPLE_TYPE") != -1 and not(line.startswith("/*")):
-                tmp = line.split("=")
-                SAMPLE_TYPE = tmp[1].strip()
-            elif line.find("SAMPLE_BITS") != -1 and not(line.startswith("/*")):
-                tmp = line.split("=")
-                SAMPLE_BITS = int(tmp[1].strip())
-
-        if block == "IMAGE_HEADER":
-            if line.find("BYTES") != -1 and not(line.startswith("/*")):
-                tmp = line.split("=")
-                BYTES = int(tmp[1].strip())
-
-        if block == "ROVER_COORDINATE_SYSTEM":
-            if line.find("ORIGIN_OFFSET_VECTOR") != -1 and not(line.startswith("/*")):
-                tmp = line.split("=")
-                ORIGIN_OFFSET_VECTOR = str(tmp[1].strip())
-
-                fline = re.sub('[(!@#$)]', '', ORIGIN_OFFSET_VECTOR)
-                pf = fline.strip().split(",")
-
-                bRoverVec[:] = float(pf[1]), float(pf[0]), -float(pf[2])
-
-            if line.find("ORIGIN_ROTATION_QUATERNION") != -1 and not(line.startswith("/*")):
-                tmp = line.split("=")
-                ORIGIN_ROTATION_QUATERNION = str(tmp[1].strip())
-
-                fline = re.sub('[(!@#$)]', '', ORIGIN_ROTATION_QUATERNION)
-                pf = fline.strip().split(",")
-
-                try:
-                    bRoverQuad[:] = float(pf[0]), float(pf[1]), float(pf[2]), float(pf[3])
-                except:
-                    tmp = f.__next__()
-                    tmp2 = str(tmp.strip())
-                    pf[3] = re.sub('[(!@#$)]', '', tmp2)
-
-                    bRoverQuad[:] = float(pf[0]), float(pf[1]), float(pf[2]), float(pf[3])
-
-        if block == "GEOMETRIC_CAMERA_MODEL":
-            if line.find("MODEL_COMPONENT_1") != -1 and not(line.startswith("/*")):
-                tmp = line.split("=")
-                MODEL_COMPONENT_1 = str(tmp[1].strip())
-
-                fline = re.sub('[(!@#$)]', '', MODEL_COMPONENT_1)
-                pf = fline.strip().split(",")
-
-                bCam[:] = float(pf[1]), float(pf[0]), -float(pf[2])
-
-            if line.find("MODEL_TRANSFORM_QUATERNION") != -1 and not(line.startswith("/*")):
-                tmp = line.split("=")
-                MODEL_TRANSFORM_QUATERNION = str(tmp[1].strip())
-
-                fline = re.sub('[(!@#$)]', '', MODEL_TRANSFORM_QUATERNION)
-                pf = fline.strip().split(",")
-
-                bCamQuad[:] = float(pf[0]), float(pf[1]), float(pf[2]), float(pf[3])
-
-            if line.find("MODEL_TRANSFORM_VECTOR") != -1 and not(line.startswith("/*")):
-                tmp = line.split("=")
-                MODEL_TRANSFORM_VECTOR = str(tmp[1].strip())
-
-                fline = re.sub('[(!@#$)]', '', MODEL_TRANSFORM_VECTOR)
-                pf = fline.strip().split(",")
-
-                bCamVec[:] = float(pf[1]), float(pf[0]), -float(pf[2])
+    # these values were not found in the label for the MSL NAVCAM, perhaps they
+    # are needed for MER NAVCAM.
+    # UNIT = label['IMAGE']['UNIT']
+    # bCamQuad[:] = label['GEOMETRIC_CAMERA_MODEL']['MODEL_TRANSFORM_QUATERNION']
+    # bCamVec[:] = label['GEOMETRIC_CAMERA_MODEL']['MODEL_TRANSFORM_VECTOR']
 
     f.close
 
