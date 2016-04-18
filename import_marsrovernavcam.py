@@ -6,9 +6,10 @@ import struct
 from urllib import request
 from datetime import datetime
 
+import numpy as np
 import mathutils
 from mathutils import Vector, Quaternion
-import pvl
+from planetaryimage import PDS3Image
 
 import bpy
 import bmesh
@@ -348,18 +349,8 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename,
 
     # This whole func needs a refactor BAD-LY
 
-    bCam = Vector((0.0, 0.0, 0.0))
-    bCamQuad = Quaternion((0.0, 0.0, 0.0, 0.0))
-    bCamVec = Vector((0.0, 0.0, 0.0))
-    bRoverVec = Vector((0.0, 0.0, 0.0))
-    bRoverQuad = Quaternion((0.0, 0.0, 0.0, 0.0))
-
     if image_depth_filename == '':
         return
-
-    creation_date = None
-    LINES = LINE_SAMPLES = SAMPLE_BITS = 0
-    SAMPLE_TYPE = ""
 
     FileAndPath = image_depth_filename
     FileAndExt = os.path.splitext(FileAndPath)
@@ -368,13 +359,20 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename,
 
     try:
         if FileAndExt[1].isupper():
-            f = open(FileAndExt[0] + ".IMG", 'r')
-            label = pvl.load(FileAndExt[0] + ".IMG")
+            image = PDS3Image.open(FileAndExt[0] + ".IMG")
+            label = image.label
         else:
-            f = open(FileAndExt[0] + ".img", 'r')
-            label = pvl.load(FileAndExt[0] + ".img")
+            image = PDS3Image.open(FileAndExt[0] + ".img")
+            label = image.label
     except:
+        print("Error opening %s" % image_depth_filename)
         return
+
+    bCam = Vector((0.0, 0.0, 0.0))
+    bCamQuad = Quaternion((0.0, 0.0, 0.0, 0.0))
+    bCamVec = Vector((0.0, 0.0, 0.0))
+    bRoverVec = Vector((0.0, 0.0, 0.0))
+    bRoverQuad = Quaternion((0.0, 0.0, 0.0, 0.0))
 
     creation_date = label['START_TIME'].strftime("%Y-%m-%dT%H:%M:%S.%f")
     LINES = label['IMAGE']['LINES']
@@ -397,81 +395,13 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename,
     # bCamQuad[:] = label['GEOMETRIC_CAMERA_MODEL']['MODEL_TRANSFORM_QUATERNION']
     # bCamVec[:] = label['GEOMETRIC_CAMERA_MODEL']['MODEL_TRANSFORM_VECTOR']
 
-    f.close
-
-    # Open the img label file (binary data part)
-    try:
-        if FileAndExt[1].isupper():
-            f2 = open(FileAndExt[0] + ".IMG", 'rb')
-        else:
-            f2 = open(FileAndExt[0] + ".img", 'rb')
-    except:
-        return
-
-    edit = f2.read()
-    meh = edit.find(b'LBLSIZE')
-    f2.seek(meh + BYTES)
-
-    # Create a list of bands containing an empty list for each band
-    bands = []
-
-    # Read data for each band at a time
-    for bandnum in range(0, 3):
-        bands.append([])
-
-        for linenum in range(0, LINES):
-
-            bands[bandnum].append([])
-
-            for pixnum in range(0, LINE_SAMPLES):
-
-                # Read one data item (pixel) from the data file.
-                dataitem = f2.read(4)
-
-                if (dataitem == ""):
-                    print ('ERROR, Ran out of data to read before we should have')
-
-                # If everything worked, unpack the binary value and store it in
-                # the appropriate pixel value
-                bands[bandnum][linenum].append(struct.unpack('>f', dataitem)[0])
-
-    f2.close
-
-    Vertex = []
     Faces = []
 
-    nulvec = Vector((0.0, 0.0, 0.0))
+    Vertex = generate_vertex_pds(image)
 
-    for j in range(0, LINES):
-        for k in range(0, LINE_SAMPLES):
-            vec = Vector((
-                float(bands[1][j][k]),
-                float(bands[0][j][k]),
-                float(-bands[2][j][k])
-            ))
-            vec = vec*0.1
-            Vertex.append(vec)
-
-    del bands
-
-    # simple dehole (bridge)
-    # max_fill_length = fill_length
-    max_fill_length = 0.6
-    if(do_fill):
-        for j in range(0, LINES-1):
-            for k in range(0, LINE_SAMPLES-1):
-                if Vertex[j * LINE_SAMPLES + k] != nulvec:
-                    m = 1
-                    while Vertex[(j + m) * LINE_SAMPLES + k] == nulvec and (j + m) < LINES-1:
-                        m = m + 1
-
-                    if m != 1 and Vertex[(j + m) * LINE_SAMPLES + k] != nulvec:
-                        VertexA = Vertex[j * LINE_SAMPLES + k]
-                        VertexB = Vertex[(j + m) * LINE_SAMPLES + k]
-                        sparevec = VertexB - VertexA
-                        if sparevec.length < max_fill_length:
-                            for n in range(0, m):
-                                Vertex[(j + n) * LINE_SAMPLES + k] = VertexA + (sparevec / m) * n
+    if do_fill:
+        print("Deholing Vertex of length: ", len(Vertex))
+        Vertex = simple_dehole(Vertex, LINES, LINE_SAMPLES)
 
     for j in range(0, LINES-1):
         for k in range(0, LINE_SAMPLES-1):
@@ -676,6 +606,54 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename,
 
     print ('mesh generation complete.')
     bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
+
+
+def generate_vertex_pds(image):
+    """Generate a List of Location Vectors from the provided PDS Image
+
+    Given a PDS image, this should retrun a list of Vectors containing the X, Y,
+    Z coordinates of each pixel in the image.
+    """
+    Vertex = []
+    vec_scale_factor = 0.1  # no idea why
+    lines = image.label['IMAGE']['LINES']
+    line_samples = image.label['IMAGE']['LINE_SAMPLES']
+
+    img = vec_scale_factor * np.dstack(
+        (image.image[:, :, 1], image.image[:, :, 0], -image.image[:, :, 2])
+    )
+
+    for line in range(0, lines):
+        for line_sample in range(0, line_samples):
+            vec = Vector(img[line, line_sample, :])
+            Vertex.append(vec)
+
+    return Vertex
+
+
+def simple_dehole(Vertex, LINES, LINE_SAMPLES):
+    # simple dehole (bridge)
+    # max_fill_length = fill_length
+    nulvec = Vector((0.0, 0.0, 0.0))
+    max_fill_length = 0.6
+
+    for j in range(0, LINES-1):
+        for k in range(0, LINE_SAMPLES - 1):
+            if Vertex[j * LINE_SAMPLES + k] != nulvec:
+                m = 1
+                while Vertex[(j + m) * LINE_SAMPLES + k] == nulvec and (j + m) < LINES-1:
+                    m = m + 1
+
+                if m != 1 and Vertex[(j + m) * LINE_SAMPLES + k] != nulvec:
+                    VertexA = Vertex[j * LINE_SAMPLES + k]
+                    VertexB = Vertex[(j + m) * LINE_SAMPLES + k]
+                    sparevec = VertexB - VertexA
+                    if sparevec.length < max_fill_length:
+                        for n in range(0, m):
+                            Vertex[(j + n) * LINE_SAMPLES + k] = VertexA + \
+                                                                 (sparevec / m) * n
+
+    return Vertex
 
 
 def look_at(obj_camera, point):
