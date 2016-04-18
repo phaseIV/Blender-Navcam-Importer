@@ -14,7 +14,7 @@ from datetime import datetime
 bl_info = {
     "name": "Mars Rover NAVCAM Import",
     "author": "Rob Haarsma (rob@captainvideo.nl)",
-    "version": (0, 1, 5),
+    "version": (0, 1, 6),
     "blender": (2, 7, 1),
     "location": "File > Import > ...  and/or  Tools menu > Misc > Mars Rover NAVCAM Import",
     "description": "Creates textured meshes of Martian surfaces from Mars Rover Navcam image products",
@@ -53,7 +53,7 @@ class NavcamDialogOperator(bpy.types.Operator):
 
     def invoke(self, context, event):
         wm = context.window_manager
-        return wm.invoke_props_dialog(self, width=600)
+        return wm.invoke_props_dialog(self, width=650)
 
 
 def ReadNavcamString(inString, inFillBool, inRadBool):
@@ -109,28 +109,22 @@ def ReadNavcamString(inString, inFillBool, inRadBool):
         
         if inRadBool:
             image_16bit_texture_filename = get_16bit_texture_image(rover, sol_ref, theString)
-            internal16bitimage = convert_to_png(image_16bit_texture_filename)
-            if (image_16bit_texture_filename == None):
-                popup_error = 1
-                bpy.context.window_manager.popup_menu(draw, title="URL Error", icon='ERROR')
-                return
+            image_texture_filename = convert_to_png(image_16bit_texture_filename)
         else:
             image_texture_filename = get_texture_image(rover, sol_ref, theString)
-            if (image_texture_filename == None):
-                popup_error = 1
-                bpy.context.window_manager.popup_menu(draw, title="URL Error", icon='ERROR')
-                return
+
+        if (image_texture_filename == None):
+            popup_error = 1
+            bpy.context.window_manager.popup_menu(draw, title="URL Error", icon='ERROR')
+            return
 
         image_depth_filename = get_depth_image(rover, sol_ref, theString)
         if (image_depth_filename == None):
             popup_error = 2
             bpy.context.window_manager.popup_menu(draw, title="URL Error", icon='ERROR')
             return
-            
-        if inRadBool:
-            create_mesh_from_depthimage(rover, sol_ref, image_depth_filename, internal16bitimage, inFillBool)
-        else:
-            create_mesh_from_depthimage(rover, sol_ref, image_depth_filename, image_texture_filename, inFillBool)
+
+        create_mesh_from_depthimage(rover, sol_ref, image_depth_filename, image_texture_filename, inFillBool, inRadBool)
     
     elapsed = float(time.time() - time_start)
     print("Script execution time: %s" % time.strftime('%H:%M:%S', time.gmtime(elapsed))) 
@@ -149,16 +143,17 @@ def SetRenderSettings():
 
 def download_file(url):
     global localfile
-
     proper_url = url.replace('\\','/')
     
     try:
         page = request.urlopen(proper_url)
+
         if page.getcode() is not 200:
-            #print('Tried to download data from %s and got http response code %s', url, str(page.getcode()))
             return False
+
         request.urlretrieve(proper_url, localfile)
         return True
+
     except:
         return False
 
@@ -377,9 +372,6 @@ def convert_to_png(image_16bit_texture_filename):
         elif tmp[0].strip() == "END_OBJECT" and tmp[1].strip() == "IMAGE_HEADER":
             block = ""
         
-        elif tmp[0].strip() == "START_TIME":
-            creation_date = str(tmp[1].strip())
-        
         if block == "IMAGE":
             if line.find("LINES") != -1 and not(line.startswith("/*")):
                 tmp = line.split("=")
@@ -387,9 +379,6 @@ def convert_to_png(image_16bit_texture_filename):
             elif line.find("LINE_SAMPLES") != -1 and not(line.startswith("/*")):
                 tmp = line.split("=")
                 LINE_SAMPLES = int(tmp[1].strip())
-            elif line.find("UNIT") != -1 and not(line.startswith("/*")):
-                tmp = line.split("=")
-                UNIT = tmp[1].strip()
             elif line.find("SAMPLE_TYPE") != -1 and not(line.startswith("/*")):
                 tmp = line.split("=")
                 SAMPLE_TYPE = tmp[1].strip()
@@ -416,8 +405,6 @@ def convert_to_png(image_16bit_texture_filename):
     edit = f2.read()
     meh = edit.find(b'LBLSIZE')
     f2.seek( meh + BYTES)
-    
-    #print(LINES, LINE_SAMPLES, SAMPLE_TYPE, SAMPLE_BITS)
     
     bands = []
     for bandnum in range(0, 1):
@@ -447,6 +434,7 @@ def convert_to_png(image_16bit_texture_filename):
             r = g = b = float(bands[0][LINES-1 - j][k] & 0xffff )  / (32768*2)
             a = 1.0
             pixels[(j * LINES) + k] = [r, g, b, a]
+            
             if r > curve_maxval: curve_maxval = r
             if r < curve_minval: curve_minval = r
     
@@ -462,7 +450,7 @@ def convert_to_png(image_16bit_texture_filename):
     settings.color_mode = 'BW'
     settings.file_format = 'PNG'
     
-    image = bpy.data.images.new('RAD-' + os.path.basename(FileAndExt[0]), LINES, LINE_SAMPLES, float_buffer=True)
+    image = bpy.data.images.new(os.path.basename(FileAndExt[0]), LINES, LINE_SAMPLES, float_buffer=True)
     image.pixels = pixels
     image.file_format = 'PNG'
     image.save_render(pngname, scene)
@@ -470,10 +458,14 @@ def convert_to_png(image_16bit_texture_filename):
     settings.color_depth = '8'
     settings.color_mode = 'RGBA'
     
+    # remove converted image from Blender, it will be reloaded
+    bpy.data.images.remove(image)
+    del pixels
+    
     return pngname
 
 
-def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_filename, do_fill):
+def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_filename, do_fill, do_rad):
     # snippets used from:
     # https://svn.blender.org/svnroot/bf-extensions/contrib/py/scripts/addons/io_import_LRO_Lola_MGS_Mola_img.py
     # https://arsf-dan.nerc.ac.uk/trac/attachment/wiki/Processing/SyntheticDataset/data_handler.py
@@ -482,11 +474,7 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
     
     global curve_minval, curve_maxval
 
-    bCam = Vector((0.0, 0.0, 0.0))
-    bCamQuad = Quaternion((0.0, 0.0, 0.0, 0.0))
-    bCamVec = Vector((0.0, 0.0, 0.0))
     bRoverVec = Vector((0.0, 0.0, 0.0))
-    bRoverQuad = Quaternion((0.0, 0.0, 0.0, 0.0))
 
     if image_depth_filename == '':
         return
@@ -523,10 +511,6 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
             block = "IMAGE_HEADER"
         elif tmp[0].strip() == "END_OBJECT" and tmp[1].strip() == "IMAGE_HEADER":
             block = ""
-        if tmp[0].strip() == "GROUP" and tmp[1].strip() == "GEOMETRIC_CAMERA_MODEL":
-            block = "GEOMETRIC_CAMERA_MODEL"
-        elif tmp[0].strip() == "END_GROUP" and tmp[1].strip() == "GEOMETRIC_CAMERA_MODEL":
-            block = ""   
         if tmp[0].strip() == "GROUP" and tmp[1].strip() == "ROVER_COORDINATE_SYSTEM":
             block = "ROVER_COORDINATE_SYSTEM"
         elif tmp[0].strip() == "END_GROUP" and tmp[1].strip() == "ROVER_COORDINATE_SYSTEM":
@@ -542,9 +526,6 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
             elif line.find("LINE_SAMPLES") != -1 and not(line.startswith("/*")):
                 tmp = line.split("=")
                 LINE_SAMPLES = int(tmp[1].strip())
-            elif line.find("UNIT") != -1 and not(line.startswith("/*")):
-                tmp = line.split("=")
-                UNIT = tmp[1].strip()
             elif line.find("SAMPLE_TYPE") != -1 and not(line.startswith("/*")):
                 tmp = line.split("=")
                 SAMPLE_TYPE = tmp[1].strip()
@@ -566,50 +547,6 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
                 pf = fline.strip().split(",")
                 
                 bRoverVec[:] = float(pf[1]), float(pf[0]), -float(pf[2])
-
-            if line.find("ORIGIN_ROTATION_QUATERNION") != -1 and not(line.startswith("/*")):
-                tmp = line.split("=")
-                ORIGIN_ROTATION_QUATERNION = str(tmp[1].strip())
-                
-                fline = re.sub('[(!@#$)]', '', ORIGIN_ROTATION_QUATERNION)
-                pf = fline.strip().split(",")
-                
-                try:
-                    bRoverQuad[:] = float(pf[0]), float(pf[1]), float(pf[2]), float(pf[3])
-                except:
-                    tmp = f.__next__()
-                    tmp2 = str(tmp.strip())
-                    pf[3] = re.sub('[(!@#$)]', '', tmp2)
-                    
-                    bRoverQuad[:] = float(pf[0]), float(pf[1]), float(pf[2]), float(pf[3])
-                
-        if block == "GEOMETRIC_CAMERA_MODEL":
-            if line.find("MODEL_COMPONENT_1") != -1 and not(line.startswith("/*")):
-                tmp = line.split("=")
-                MODEL_COMPONENT_1 = str(tmp[1].strip())
-                
-                fline = re.sub('[(!@#$)]', '', MODEL_COMPONENT_1)
-                pf = fline.strip().split(",")
-                
-                bCam[:] = float(pf[1]), float(pf[0]), -float(pf[2])
-
-            if line.find("MODEL_TRANSFORM_QUATERNION") != -1 and not(line.startswith("/*")):
-                tmp = line.split("=")
-                MODEL_TRANSFORM_QUATERNION = str(tmp[1].strip())
-                
-                fline = re.sub('[(!@#$)]', '', MODEL_TRANSFORM_QUATERNION)
-                pf = fline.strip().split(",")
-                
-                bCamQuad[:] = float(pf[0]), float(pf[1]), float(pf[2]), float(pf[3])
-                
-            if line.find("MODEL_TRANSFORM_VECTOR") != -1 and not(line.startswith("/*")):
-                tmp = line.split("=")
-                MODEL_TRANSFORM_VECTOR = str(tmp[1].strip())
-                
-                fline = re.sub('[(!@#$)]', '', MODEL_TRANSFORM_VECTOR)
-                pf = fline.strip().split(",")
-                
-                bCamVec[:] = float(pf[1]), float(pf[0]), -float(pf[2])
 
     f.close
 
@@ -737,8 +674,8 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
             mtex.texture.extension = 'CLIP'
             mtex.texture_coords = 'UV'        
 
-            if curve_minval != None:
-                # color curves
+            if do_rad:
+                # add nodes to clip 16bit luminance roi
                 the_mat.use_nodes = True
 
                 tree = the_mat.node_tree
@@ -793,8 +730,8 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
             bpy.data.objects[TARGET_NAME].data.uv_layers[0].data[uvteller].uv = tc4
             uvteller = uvteller + 1
  
+    # remove verts lacking xyz data
     bpy.ops.object.mode_set(mode='EDIT')
-    # Get the active mesh
     mesh_ob = bpy.context.object
     me = mesh_ob.data
     bm = bmesh.from_edit_mesh(me)
@@ -803,8 +740,8 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
     bmesh.ops.delete(bm, geom=verts, context=1)
     bmesh.update_edit_mesh(me)
 
+    # remove redundant verts
     bpy.ops.object.mode_set(mode='EDIT')
-    # Get the active mesh
     mesh_ob = bpy.context.object
     me = mesh_ob.data
     bm = bmesh.from_edit_mesh(me)
@@ -815,21 +752,6 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
 
     bpy.ops.object.editmode_toggle()
     
-    '''
-    #smooth modifier prop
-    if smooth:
-        bpy.ops.object.modifier_add(type='SMOOTH')
-        bpy.context.active_object.modifiers['Smooth'].factor=smoothfac_ref
-        bpy.context.active_object.modifiers['Smooth'].iterations=smoothrepeat_ref
-        bpy.ops.object.modifier_apply(modifier='Smooth')
-        
-    #decimate modifier prop
-    if decimate:
-        bpy.ops.object.modifier_add(type='DECIMATE')
-        bpy.context.active_object.modifiers['Decimate'].ratio=decimate_ref
-        bpy.ops.object.modifier_apply(modifier='Decimate')
-    '''
-         
     bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY')
     bpy.ops.object.mode_set(mode='OBJECT')
     
@@ -916,10 +838,8 @@ def look_at(obj_camera, point):
     loc_camera = obj_camera.matrix_world.to_translation()
 
     direction = point - loc_camera
-    # point the cameras '-Z' and use its 'Y' as up
-    rot_quat = direction.to_track_quat('-Z', 'Y')
 
-    # assume we're using euler rotation
+    rot_quat = direction.to_track_quat('-Z', 'Y')
     obj_camera.rotation_euler = rot_quat.to_euler()
 
 
