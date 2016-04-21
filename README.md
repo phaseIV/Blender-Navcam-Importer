@@ -20,6 +20,8 @@ Note that this process takes a while and Blender is unresponsive during executio
 
 The resulting mesh, which is in no way scientifically accurate, can contain over a million vertices and will have gaps and glitches. For artistic purposes this addon provides an option to fill small gaps.
 
+UPDATE 17 Apr 2016: The addon is upgraded with an option to use 16bit RAD images for texturing the mesh.
+
 Check this [page](https://github.com/phaseIV/Blender-Navcam-Importer/wiki/Instructions) for further instructions.
 
 ## Notes
