@@ -1,5 +1,7 @@
 import bpy
 import os
+import subprocess
+import sys
 import math
 import mathutils
 from mathutils import Vector, Quaternion
@@ -14,7 +16,7 @@ from datetime import datetime
 bl_info = {
     "name": "Mars Rover NAVCAM Import",
     "author": "Rob Haarsma (rob@captainvideo.nl)",
-    "version": (0, 1, 6),
+    "version": (0, 1, 7),
     "blender": (2, 7, 1),
     "location": "File > Import > ...  and/or  Tools menu > Misc > Mars Rover NAVCAM Import",
     "description": "Creates textured meshes of Martian surfaces from Mars Rover Navcam image products",
@@ -25,7 +27,7 @@ bl_info = {
 
 
 
-pdsimg_path = 'http://pdsimg.jpl.nasa.gov/data/'
+pdsimg_path = 'https://pdsimg.jpl.nasa.gov/data/'
 nasaimg_path = 'http://mars.nasa.gov/'
 
 roverDataDir = []
@@ -145,17 +147,33 @@ def download_file(url):
     global localfile
     proper_url = url.replace('\\','/')
     
-    try:
-        page = request.urlopen(proper_url)
+    if sys.platform == 'darwin':
+        try:
+            out = subprocess.check_output(['curl', '-I', proper_url])
 
-        if page.getcode() is not 200:
+            if out.decode().find('200 OK') > 0:
+                subprocess.call(['curl', '-o', localfile, '-L', proper_url])
+                return True
+            else:
+                print('Fail to reach a server.\n\n{}'.format(out.decode()))
+                return False
+
+        except subprocess.CalledProcessError as e:
+            print('Subprocess failed:\nReturncode: {}\n\nOutput:{}'.format(e.returncode, e.output))
             return False
+                  
+    else:
+        try:
+            page = request.urlopen(proper_url)
 
-        request.urlretrieve(proper_url, localfile)
-        return True
+            if page.getcode() is not 200:
+                return False
 
-    except:
-        return False
+            request.urlretrieve(proper_url, localfile)
+            return True
+
+        except:
+            return False
 
 
 def tosol(rover, nameID):
