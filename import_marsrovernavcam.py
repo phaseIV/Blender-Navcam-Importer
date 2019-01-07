@@ -96,6 +96,8 @@ def ReadNavcamString(inString, inFillBool, inRadBool):
             bpy.context.window_manager.popup_menu(draw, title="Name Error", icon='ERROR')
             return
 
+        sol_ref = tosol(rover, theString)
+        
         if rover == 1:
             roverDataDir = 'mer/mer2no_0xxx/data/'
             roverImageDir = 'mer/gallery/all/2/n/'
@@ -103,10 +105,13 @@ def ReadNavcamString(inString, inFillBool, inRadBool):
             roverDataDir = 'mer/mer1no_0xxx/data/'
             roverImageDir = 'mer/gallery/all/1/n/'
         if rover == 3:
-            roverDataDir = 'msl/MSLNAV_1XXX/DATA/'
-            roverImageDir = 'msl/MSLNAV_1XXX/EXTRAS/FULL/'
+            if sol_ref < 1870:
+                roverDataDir = 'msl/MSLNAV_1XXX/DATA_V1/'
+                roverImageDir = 'msl/MSLNAV_1XXX/EXTRAS_V1/FULL/'
+            else:
+                roverDataDir = 'msl/MSLNAV_1XXX/DATA/'
+                roverImageDir = 'msl/MSLNAV_1XXX/EXTRAS/FULL/'
 
-        sol_ref = tosol(rover, theString)
         print( '\nConstructing mesh %d/%d, sol %d, name %s' %( i + 1, len(collString), sol_ref, theString) )
         
         if inRadBool:
