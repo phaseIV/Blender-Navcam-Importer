@@ -16,7 +16,7 @@ from datetime import datetime
 bl_info = {
     "name": "Mars Rover NAVCAM Import",
     "author": "Rob Haarsma (rob@captainvideo.nl)",
-    "version": (0, 1, 7),
+    "version": (0, 1, 8),
     "blender": (2, 7, 1),
     "location": "File > Import > ...  and/or  Tools menu > Misc > Mars Rover NAVCAM Import",
     "description": "Creates textured meshes of Martian surfaces from Mars Rover Navcam image products",
