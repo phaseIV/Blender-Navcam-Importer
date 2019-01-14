@@ -6,7 +6,7 @@ Addon for Blender that creates Martian surfaces from Mars Rover NAVCAM images.
 See a movie here: https://vimeo.com/160405895
 
 ## Installation
-Download the python script and install as addon in Blender’s Preference panel. Enable it.
+Download the python script (v2 for Blender 2.80+) and install as addon in Blender’s Preference panel. Enable it.
 Select the addon from the Import Menu (File > Import) or from the Misc tab in the Tools menu.
 
 ## How?
