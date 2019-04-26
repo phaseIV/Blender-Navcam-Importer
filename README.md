@@ -18,7 +18,7 @@ Download the python script (v2 for Blender 2.80+) and install as addon in Blende
 Select the addon from the Import Menu (File > Import) or from the Misc tab in the Tools menu.
 
 ## How does it work?
-Activate the addon and enter or paste the name of a valid Left Navcam image (with or without extension) in the popup dialog and press OK. The addon will automatically download the corresponding depth and image products from PDS/NASA and stitch the data together into a single UV textured mesh. It will then add a caption, set a camera and adjust a few settings so Blender can render the scene immediately.
+Activate the addon and enter or paste the name of a valid Left Navcam image (with or without extension) in the popup dialog and press OK. The addon will automatically download the corresponding depth and image products from the NASA/PDS image archive and stitch the data together into a single UV textured mesh. It will then add a caption, set a camera and adjust a few settings so Blender can render the scene immediately.
   
 Note that this process takes a while and Blender is unresponsive during execution. The status of the addon can be checked in the terminal window.
 
