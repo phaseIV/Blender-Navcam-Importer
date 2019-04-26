@@ -5,14 +5,22 @@ Addon for Blender that creates Martian surfaces from Mars Rover NAVCAM images.
 
 See a movie here: https://vimeo.com/160405895
 
+## Introduction
+
+For autonomous driving on Mars every rover is equipped with a set of (Left and Right) Navigation camera's. From the photo's made with these camera's a depth map is computed which is used by the rover to avoid collisions with rocks or other obstacles. These depth maps, which are basically digitized Martian landscapes, get transmitted back to earth with all other obtained data and after a four month period they appear online in the [Planetary Data System Imaging](http://pdsimg.jpl.nasa.gov) archive from NASA.
+ 
+The Navcam-importer addon is able to locate and decode the depth maps and import them into Blender. The only thing required is the filename of a valid Left Navcam image to retrieve the corresponding data from the NASA/PDS archive. Example filenames are:  
+- for Spirit:        2N227484705MRDAS2JP1981L0M1  
+- for Opportunity:   1N142657823MRD3221P1971L0M1
+- for Curiosity:     NLB_499684210EDR_F0501222NCAM00290M_
+
 ## Installation
 Download the python script (v2 for Blender 2.80+) and install as addon in Blender’s Preference panel. Enable it.
 Select the addon from the Import Menu (File > Import) or from the Misc tab in the Tools menu.
 
-## How?
-It works fairly simple, enter or paste the name of a valid Left Navcam image (with or without extension) in the popup dialog and press OK.
-The addon will automatically download the corresponding depth and image products from PDS/NASA and stitches the data together into a single UV textured mesh.
-Then it will add a caption, set a camera and adjust a few settings so Blender can render the scene immediately.
+## How does it work?
+Enter or paste the name of a valid Left Navcam image (with or without extension) in the popup dialog and press OK.
+The addon will automatically download the corresponding depth and image products from PDS/NASA and stitch the data together into a single UV textured mesh. It will then add a caption, set a camera and adjust a few settings so Blender can render the scene immediately.
   
 Note that this process takes a while and Blender is unresponsive during execution. The status of the addon can be checked in the terminal window.
 
