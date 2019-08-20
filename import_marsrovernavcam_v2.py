@@ -893,7 +893,7 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
     try:
         with open(image_texture_filename):
             img = bpy.data.images.load(image_texture_filename)
-            img.pack(as_png=False)
+            img.pack()
             
             engine = bpy.context.scene.render.engine
             if engine in {'CYCLES', 'BLENDER_EEVEE', 'BLENDER_OPENGL'}:
@@ -903,7 +903,7 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
             obj.data.materials.append(material)
 
             me = obj.data
-            me.show_double_sided = True
+            #me.show_double_sided = True
             bpy.ops.mesh.uv_texture_add()
 
     except IOError:
@@ -1025,7 +1025,7 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
     
     theSolCollection.objects.link(cam_ob)
     bpy.context.scene.camera = cam_ob
-    bpy.context.scene.update()
+    #bpy.context.scene.update()
 
     print ('mesh generation complete.')
 
