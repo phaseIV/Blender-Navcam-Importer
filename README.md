@@ -6,7 +6,7 @@ Addon for Blender that creates Martian surfaces from Mars Rover NAVCAM images.
 See a movie here: https://vimeo.com/160405895
 
 ## Introduction
-For autonomous driving on Mars every rover is equipped with a set of (Left and Right) Navigation camera's. From the photo's made with these camera's a depth map is computed which is used by the rover to avoid collisions with rocks or other obstacles. These depth maps, which are basically digitized Martian landscapes, get transmitted back to earth with all other obtained data and after a four month period they appear online in the [Planetary Data System Imaging](http://pdsimg.jpl.nasa.gov) archive from NASA.
+For autonomous driving on Mars every rover is equipped with a set of (Left and Right) Navigation camera's. From the photo's made with these camera's a depth map is computed which is used by the rover to avoid collisions with rocks or other obstacles. These depth maps, which are basically digitized Martian landscapes, get transmitted back to earth with all other obtained data and after a four month period they appear online in the [Planetary Data System Imaging](http://pds-imaging.jpl.nasa.gov) archive from NASA.
  
 The Navcam-importer addon is able to locate and decode the depth maps and import them into Blender. The only thing required is the filename of a valid Left Navcam image to retrieve the corresponding data from the NASA/PDS archive. Example filenames are:  
 - for Spirit:        2N227484705MRDAS2JP1981L0M1  
