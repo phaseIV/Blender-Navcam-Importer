@@ -27,7 +27,11 @@ bl_info = {
 
 
 pdsimg_path = 'https://pds-imaging.jpl.nasa.gov/data/'
-nasaimg_path = 'https://mars.nasa.gov/'
+# mirror: https://pdsimage2.wr.usgs.gov/data/mer2no/mer2no_0xxx/data/sol1869/rdr/
+
+nasaimg_path = 'https://mars.nasa.gov/'  # obsolete, look into:
+# https://pds-imaging.jpl.nasa.gov/data/mer2-m-navcam-5-xyz-ops-v1.0/mer2no_0xxx/data/
+# https://pds-imaging.jpl.nasa.gov/data/mer/mer2no_0xxx/data/
 
 roverDataDir = []
 roverImageDir = []
@@ -38,6 +42,10 @@ popup_error = None
 curve_minval = None
 curve_maxval = None
 
+SPIRIT = 1
+OPPORTUNITY = 2
+CURIOSITY = 3
+
 
 class NavcamDialogOperator(bpy.types.Operator):
     bl_idname = "io.navcamdialog_operator"
@@ -47,7 +55,7 @@ class NavcamDialogOperator(bpy.types.Operator):
     fillhole_bool: bpy.props.BoolProperty(name="Fill Gaps (draft)", default = True)
     #filllength_float: bpy.props.FloatProperty(name="Max Fill Length", min=0.001, max=100.0, default=0.6)
     radimage_bool: bpy.props.BoolProperty(name="Use 16bit RAD texture", default = False)
-        
+
     def execute(self, context):
         ReadNavcamString(self.navcam_string, self.fillhole_bool, self.radimage_bool)
         return {'FINISHED'}
@@ -61,16 +69,16 @@ def ReadNavcamString(inString, inFillBool, inRadBool):
     global local_data_dir, roverDataDir, roverImageDir, popup_error, curve_minval, curve_maxval
 
     if inString=="": return
-    
+
     time_start = time.time()
-    
+
     SetRenderSettings()
     local_data_dir = os.path.join(bpy.context.preferences.filepaths.temporary_directory, 'MarsRoverImages/')
 
     collString = inString.split(",")
     for i in range(0, len(collString)):
         if(len(collString[i]) == 0): collString.pop(i)
-    
+
     for i in range(0, len(collString)):
         theString = os.path.splitext(collString[i].strip( ' ' ))[0]
 
@@ -82,14 +90,14 @@ def ReadNavcamString(inString, inFillBool, inRadBool):
             return
 
         rover = None
-   
+
         if theString.startswith( 'N' ):
-            rover = 3
+            rover = CURIOSITY
         if theString.startswith( '2N' ):
-            rover = 1
+            rover = SPIRIT
         if theString.startswith( '1N' ):
-            rover = 2
-        
+            rover = OPPORTUNITY
+
         if rover == None:
             popup_error = 4
             bpy.context.window_manager.popup_menu(draw, title="Name Error", icon='ERROR')
@@ -97,13 +105,13 @@ def ReadNavcamString(inString, inFillBool, inRadBool):
 
         sol_ref = tosol(rover, theString)
 
-        if rover == 1:
-            roverDataDir = 'mer/mer2no_0xxx/data/'
-            roverImageDir = 'mer/gallery/all/2/n/'
-        if rover == 2:
-            roverDataDir = 'mer/mer1no_0xxx/data/'
-            roverImageDir = 'mer/gallery/all/1/n/'
-        if rover == 3:
+        if rover == SPIRIT:
+            roverDataDir = 'mer/mer2no_0xxx/data/'  # Now 'spirit/mer2no_0xxx/data/'
+            roverImageDir = 'mer/gallery/all/2/n/'  # Now 'spirit/mer2no_0xxx/browse/' ?
+        if rover == OPPORTUNITY:
+            roverDataDir = 'mer/mer1no_0xxx/data/'  # Now 'opportunity/mer2no_0xxx/data/'
+            roverImageDir = 'mer/gallery/all/1/n/'  # Now 'opportunity/mer2no_0xxx/browse/' ?
+        if rover == CURIOSITY:
             if sol_ref < 1870:
                 roverDataDir = 'msl/MSLNAV_1XXX/DATA_V1/'
                 roverImageDir = 'msl/MSLNAV_1XXX/EXTRAS_V1/FULL/'
@@ -112,7 +120,7 @@ def ReadNavcamString(inString, inFillBool, inRadBool):
                 roverImageDir = 'msl/MSLNAV_1XXX/EXTRAS/FULL/'
 
         print( '\nConstructing mesh %d/%d, sol %d, name %s' %( i + 1, len(collString), sol_ref, theString) )
-        
+
         curve_minval = 0.0
         curve_maxval = 1.0
 
@@ -134,13 +142,13 @@ def ReadNavcamString(inString, inFillBool, inRadBool):
             return
 
         create_mesh_from_depthimage(rover, sol_ref, image_depth_filename, image_texture_filename, inFillBool, inRadBool)
-    
-    elapsed = float(time.time() - time_start)
-    print("Script execution time: %s" % time.strftime('%H:%M:%S', time.gmtime(elapsed))) 
 
-        
+    elapsed = float(time.time() - time_start)
+    print("Script execution time: %s" % time.strftime('%H:%M:%S', time.gmtime(elapsed)))
+
+
 def SetRenderSettings():
-    rnd = bpy.data.scenes[0].render  
+    rnd = bpy.data.scenes[0].render
     rnd.resolution_x = 1024
     rnd.resolution_y = 1024
     rnd.resolution_percentage = 100
@@ -155,7 +163,7 @@ def SetRenderSettings():
 def download_file(url):
     global localfile
     proper_url = url.replace('\\','/')
-    
+
     if sys.platform == 'darwin':
         try:
             out = subprocess.check_output(['curl', '-I', proper_url])
@@ -170,7 +178,7 @@ def download_file(url):
         except subprocess.CalledProcessError as e:
             print('Subprocess failed:\nReturncode: {}\n\nOutput:{}'.format(e.returncode, e.output))
             return False
-                  
+
     else:
         try:
             page = request.urlopen(proper_url)
@@ -186,64 +194,90 @@ def download_file(url):
 
 
 def tosol(rover, nameID):
+
+	# MER naming convention:
+	# https://pds-imaging.jpl.nasa.gov/data/mer2-m-navcam-5-xyz-ops-v1.0/mer2no_0xxx/document/CAMSIS_latest.PDF
+
+    # 2N290962708XYLB0HMP0755L0M2
+    # 0:     2         = MER2
+    # 1:     N         = Navcam
+    # 2-10:  290962708 = Spacecraft clock
+    # 11-13: XYL       = XYL product
+    # 14-15: B0        = site
+    # 16-17: HM        = drive/position w.r.t site
+    # 18-22: P0755     = sequence
+    # 23:    L         = left
+    # 24:    0         = filter
+    # 25:    M         = Author (MIPL)
+    # 26:    2         = Product version
+
     # origin: https://github.com/natronics/MSL-Feed/blob/master/nasa.py
-    # function hacked to return sol from image filename   
+    # function hacked to return sol from image filename
     craft_time = None
-    
-    if rover == 3:
+
+    if rover == CURIOSITY:
         craft_time = nameID[4:13]
-    if rover == 2 or rover == 1:
-        craft_time = nameID[2:11]
-    
+    if rover == OPPORTUNITY or rover == SPIRIT:
+        craft_time = nameID[2:11] # Warning: 2:10
+
     s = int(craft_time)
     MSD = (s/88775.244) + 44795.9998
 
     sol = MSD - 49269.2432411704
     sol = sol + 1  # for sol 0
     sol = int(math.ceil(sol))
-    
+
     deviate = None
-    
-    if rover == 3:
+
+    if rover == CURIOSITY:
         deviate = -6
-    if rover == 2:
+    if rover == OPPORTUNITY:
         deviate = 3028
-    if rover == 1:
+    if rover == SPIRIT:
         deviate = 3048
-    
+
     return sol+deviate
 
 
 def get_texture_image(rover, sol, imgname):
     global roverImageDir, local_data_dir, localfile
-    
-    if rover == 3:
+
+    if rover == CURIOSITY:
         if sol > 450:
             texname = '%s.PNG' %( imgname )
         else:
             texname = '%s.JPG' %( imgname )
     else:
         texname = '%s.JPG' %( imgname )
-    
+
     s = list( texname )
-    
-    if rover == 3:
+
+    if rover == CURIOSITY:
         s[13] = 'R'
         s[14] = 'A'
         s[15] = 'S'
         s[35] = '1'
     else:
+    # Full frame EDR “EFF” 
+    # Sub-frame EDR “ESF” 
+    # Downsampled EDR “EDN” 
+    # Thumbnail EDR “ETH” 
+    # Row Summed EDR “ERS”
+    # Column Summed EDR “ECS” 
+    # Reference Pixels EDR “ERP” 
+    # Histogram EDR “EHG”
+
         if s[18] == 'F' or s[18] == 'f':
             #mer downsampled??
             s[11] = 'e'
             s[12] = 'd'
             s[13] = 'n'
-            s[25] = 'm'
+            s[25] = 'm'  # Warning: product code is only 3 characters long; 4th character pertains to site number, coded in letter+number format
         else:
             s[11] = 'e'
             s[12] = 'f'
             s[13] = 'f'
-            s[25] = 'm'
+            s[25] = 'm'  # Warning: product code is only 3 characters long; 4th character pertains to site number, coded in letter+number format
 
     imagename = '%s' % "".join(s)
     imgfilename = os.path.join(local_data_dir, roverImageDir, '%05d' %(sol), imagename )
@@ -251,35 +285,35 @@ def get_texture_image(rover, sol, imgname):
     if os.path.isfile(imgfilename):
         print('tex from cache: ', imgfilename)
         return imgfilename
-    
+
     retrievedir = os.path.join(os.path.dirname(local_data_dir), roverImageDir, '%05d' %( sol ) )
     if not os.path.exists(retrievedir):
         os.makedirs(retrievedir)
 
     localfile = imgfilename
-    
-    if rover == 2 or rover == 1:
+
+    if rover == OPPORTUNITY or rover == SPIRIT:
          remotefile = os.path.join(os.path.dirname(nasaimg_path), roverImageDir, '%03d' %(sol), imagename.upper() )
-    if rover == 3:
+    if rover == CURIOSITY:
         remotefile = os.path.join(os.path.dirname(pdsimg_path), roverImageDir, 'SOL%05d' %(sol), imagename )
-    
+
     print('downloading tex: ', remotefile)
-    
+
     result = download_file(remotefile)
     if(result == False):
         return None
-        
+
     if os.path.isfile(localfile):
         return imgfilename
 
 
 def get_16bit_texture_image(rover, sol, imgname):
     global roverImageDir, local_data_dir, localfile
-    
+
     texname = '%s.IMG' %( imgname )
     s = list( texname )
-    
-    if rover == 3:
+
+    if rover == CURIOSITY:
         s[13] = 'R'
         s[14] = 'A'
         s[15] = 'D'
@@ -288,32 +322,32 @@ def get_16bit_texture_image(rover, sol, imgname):
         s[11] = 'm'
         s[12] = 'r'
         s[13] = 'd'
-        s[25] = 'm'
-    
+        s[25] = 'm  '# Warning: product code is only 3 characters long; 4th character pertains to site number, coded in letter+number format
+
     imagename = '%s' % "".join(s)
     imgfilename = os.path.join(local_data_dir, roverDataDir, 'sol%05d' %(sol), imagename )
-    
+
     if os.path.isfile(imgfilename):
         print('rad from cache: ', imgfilename)
         return imgfilename
-    
+
     retrievedir = os.path.join(os.path.dirname(local_data_dir), roverDataDir, 'sol%05d' %( sol ) )
     if not os.path.exists(retrievedir):
         os.makedirs(retrievedir)
-    
+
     localfile = imgfilename
-    
-    if rover == 2 or rover == 1:
+
+    if rover == OPPORTUNITY or rover == SPIRIT:
         remotefile = os.path.join(os.path.dirname(pdsimg_path), roverDataDir, 'sol%04d' %(sol), 'rdr', imagename.lower() )
-    if rover == 3:
+    if rover == CURIOSITY:
         remotefile = os.path.join(os.path.dirname(pdsimg_path), roverDataDir, 'SOL%05d' %(sol), imagename )
-    
+
     print('downloading rad: ', remotefile)
-    
+
     result = download_file(remotefile)
     if(result == False):
         return None
-    
+
     if os.path.isfile(localfile):
         return imgfilename
 
@@ -323,8 +357,8 @@ def get_depth_image(rover, sol, imgname):
 
     xyzname = '%s.IMG' %( imgname )
     s = list( xyzname )
-    
-    if rover == 3:
+
+    if rover == CURIOSITY:
         s[13] = 'X'
         s[14] = 'Y'
         s[15] = 'Z'
@@ -333,24 +367,24 @@ def get_depth_image(rover, sol, imgname):
         s[11] = 'x'
         s[12] = 'y'
         s[13] = 'l'
-        s[25] = 'm'
-    
+        s[25] = 'm' # Warning: product code is only 3 characters long; 4th character pertains to site number, coded in letter+number format
+
     xyzname = '%s' % "".join(s)
     xyzfilename = os.path.join(local_data_dir, roverDataDir, 'sol%05d' %(sol), xyzname )
 
     if os.path.isfile(xyzfilename):
         print('xyz from cache: ', xyzfilename)
         return xyzfilename
-    
+
     retrievedir = os.path.join(local_data_dir, roverDataDir, 'sol%05d' %(sol) )
     if not os.path.exists(retrievedir):
         os.makedirs(retrievedir)
 
     localfile = xyzfilename
-    
-    if rover == 2 or rover == 1:
+
+    if rover == OPPORTUNITY or rover == SPIRIT:
         remotefile = os.path.join(os.path.dirname(pdsimg_path), roverDataDir, 'sol%04d' %(sol), 'rdr', xyzname.lower() )
-    if rover == 3:
+    if rover == CURIOSITY:
         remotefile = os.path.join(os.path.dirname(pdsimg_path), roverDataDir, 'SOL%05d' %(sol), xyzname )
 
     print('downloading xyz: ', remotefile)
@@ -358,22 +392,22 @@ def get_depth_image(rover, sol, imgname):
     result = download_file(remotefile)
     if(result == False):
         return None
-    
+
     if os.path.isfile(localfile):
         return xyzfilename
 
 
 def convert_to_png(image_16bit_texture_filename):
     global curve_minval, curve_maxval
-    
+
     LINES = LINE_SAMPLES = SAMPLE_BITS = BYTES = 0
     SAMPLE_TYPE = ""
-    
+
     FileAndPath = image_16bit_texture_filename
     FileAndExt = os.path.splitext(FileAndPath)
-    
+
     print('creating png...')
-    
+
     # Open the img file (ascii label part)
     try:
         if FileAndExt[1].isupper():
@@ -382,7 +416,7 @@ def convert_to_png(image_16bit_texture_filename):
             f = open(FileAndExt[0] + ".img", 'r')
     except:
         return
-    
+
     block = ""
     OFFSET = 0
     for line in f:
@@ -397,7 +431,7 @@ def convert_to_png(image_16bit_texture_filename):
             block = "IMAGE_HEADER"
         elif tmp[0].strip() == "END_OBJECT" and tmp[1].strip() == "IMAGE_HEADER":
             block = ""
-        
+
         if block == "IMAGE":
             if line.find("LINES") != -1 and not(line.startswith("/*")):
                 tmp = line.split("=")
@@ -411,14 +445,14 @@ def convert_to_png(image_16bit_texture_filename):
             elif line.find("SAMPLE_BITS") != -1 and not(line.startswith("/*")):
                 tmp = line.split("=")
                 SAMPLE_BITS = int(tmp[1].strip())
-        
+
         if block == "IMAGE_HEADER":
             if line.find("BYTES") != -1 and not(line.startswith("/*")):
                 tmp = line.split("=")
                 BYTES = int(tmp[1].strip())
-    
+
     f.close
-    
+
     # Open the img file (binary data part)
     try:
         if FileAndExt[1].isupper():
@@ -427,67 +461,67 @@ def convert_to_png(image_16bit_texture_filename):
             f2 = open(FileAndExt[0] + ".img", 'rb')
     except:
         return
-    
+
     edit = f2.read()
     meh = edit.find(b'LBLSIZE')
     f2.seek( meh + BYTES)
-    
+
     bands = []
     for bandnum in range(0, 1):
-        
+
         bands.append([])
         for linenum in range(0, LINES):
-            
+
             bands[bandnum].append([])
             for pixnum in range(0, LINE_SAMPLES):
-                
+
                 dataitem = f2.read(2)
                 if (dataitem == ""):
                     print ('ERROR, Ran out of data to read before we should have')
-                
+
                 bands[bandnum][linenum].append(struct.unpack(">H", dataitem)[0])
-    
+
     f2.close
-    
+
     pixels = [None] * LINES * LINE_SAMPLES
-        
+
     curve_minval = 1.0
     curve_maxval = 0.0
 
     for j in range(0, LINES):
         for k in range(0, LINE_SAMPLES):
-            
+
             r = g = b = float(bands[0][LINES-1 - j][k] & 0xffff )  / (32768*2)
             a = 1.0
             pixels[(j * LINES) + k] = [r, g, b, a]
-            
+
             if r > curve_maxval: curve_maxval = r
             if r < curve_minval: curve_minval = r
-    
+
     del bands
-    
+
     pixels = [chan for px in pixels for chan in px]
     pngname = FileAndExt[0] + '.PNG'
-    
+
     # modify scene for png export
     scene = bpy.data.scenes[0]
     settings = scene.render.image_settings
     settings.color_depth = '16'
     settings.color_mode = 'BW'
     settings.file_format = 'PNG'
-    
+
     image = bpy.data.images.new(os.path.basename(FileAndExt[0]), LINES, LINE_SAMPLES, float_buffer=True)
     image.pixels = pixels
     image.file_format = 'PNG'
     image.save_render(pngname)
-    
+
     settings.color_depth = '8'
     settings.color_mode = 'RGBA'
-    
+
     # remove converted image from Blender, it will be reloaded
     bpy.data.images.remove(image)
     del pixels
-    
+
     return pngname
 
 
@@ -655,7 +689,7 @@ def create_cycles_material(context, image):
     tex_image = create_cycles_texnode(context, node_tree, image)
 
     core_shader = get_shadeless_node(node_tree)
-     
+
     curvenode = node_tree.nodes.new('ShaderNodeRGBCurve')
     curvenode.mapping.curves[3].points[0].location.x = curve_minval
     curvenode.mapping.curves[3].points[0].location.y = 0.0
@@ -665,7 +699,7 @@ def create_cycles_material(context, image):
 
     # Connect color from texture to curves
     node_tree.links.new(curvenode.inputs[1], tex_image.outputs[0])
- 
+
     #Connect color from curves to shadeless
     node_tree.links.new(core_shader.inputs[0], curvenode.outputs[0])
     node_tree.links.new(out_node.inputs[0], core_shader.outputs[0])
@@ -723,14 +757,14 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
 
     if image_depth_filename == '':
         return
-    
+
     creation_date = None
     LINES = LINE_SAMPLES = SAMPLE_BITS = 0
     SAMPLE_TYPE = ""
-    
+
     FileAndPath = image_depth_filename
     FileAndExt = os.path.splitext(FileAndPath)
-    
+
     print('creating mesh...')
 
     # Open the img label file (ascii label part)
@@ -760,10 +794,10 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
             block = "ROVER_COORDINATE_SYSTEM"
         elif tmp[0].strip() == "END_GROUP" and tmp[1].strip() == "ROVER_COORDINATE_SYSTEM":
             block = ""
-        
+
         elif tmp[0].strip() == "START_TIME":
             creation_date = str(tmp[1].strip())
-        
+
         if block == "IMAGE":
             if line.find("LINES") != -1 and not(line.startswith("/*")):
                 tmp = line.split("=")
@@ -787,10 +821,10 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
             if line.find("ORIGIN_OFFSET_VECTOR") != -1 and not(line.startswith("/*")):
                 tmp = line.split("=")
                 ORIGIN_OFFSET_VECTOR = str(tmp[1].strip())
-                
+
                 fline = re.sub('[(!@#$)]', '', ORIGIN_OFFSET_VECTOR)
                 pf = fline.strip().split(",")
-                
+
                 bRoverVec[:] = float(pf[1]), float(pf[0]), -float(pf[2])
 
     f.close
@@ -803,35 +837,35 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
             f2 = open(FileAndExt[0] + ".img", 'rb')
     except:
         return
-            
+
     edit = f2.read()
     meh = edit.find(b'LBLSIZE')
     f2.seek( meh + BYTES)
 
     # Create a list of bands containing an empty list for each band
     bands = []
-    
+
     # Read data for each band at a time
     for bandnum in range(0, 3):
         bands.append([])
-        
+
         for linenum in range(0, LINES):
-            
+
             bands[bandnum].append([])
-            
+
             for pixnum in range(0, LINE_SAMPLES):
-            
+
                 # Read one data item (pixel) from the data file.
                 dataitem = f2.read(4)
-                
+
                 if (dataitem == ""):
                     print ('ERROR, Ran out of data to read before we should have')
-                
+
                 # If everything worked, unpack the binary value and store it in the appropriate pixel value
                 bands[bandnum][linenum].append(struct.unpack('>f', dataitem)[0])
 
     f2.close
-    
+
     Vertex = []
     Faces = []
 
@@ -842,20 +876,20 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
             vec = Vector((float(bands[1][j][k]), float(bands[0][j][k]), float(-bands[2][j][k])))
             vec = vec*0.1
             Vertex.append(vec)
-            
+
     del bands
-    
+
     #simple dehole (bridge)
     #max_fill_length = fill_length
     max_fill_length = 0.6
-    if(do_fill):       
+    if(do_fill):
         for j in range(0, LINES-1):
             for k in range(0, LINE_SAMPLES-1):
                 if Vertex[j * LINE_SAMPLES + k] != nulvec:
                     m = 1
                     while Vertex[(j + m) * LINE_SAMPLES + k] == nulvec and (j + m) < LINES-1:
                         m = m + 1
-                    
+
                     if m != 1 and Vertex[(j + m) * LINE_SAMPLES + k] != nulvec:
                         VertexA = Vertex[j * LINE_SAMPLES + k]
                         VertexB = Vertex[(j + m) * LINE_SAMPLES + k]
@@ -867,7 +901,7 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
     for j in range(0, LINES-1):
         for k in range(0, LINE_SAMPLES-1):
             Faces.append(( (j * LINE_SAMPLES + k), (j * LINE_SAMPLES + k + 1), ((j + 1) * LINE_SAMPLES + k + 1), ((j + 1) * LINE_SAMPLES + k) ))
-            
+
     os.path.basename(FileAndExt[0])
     TARGET_NAME = '%s-%s' %(sol, os.path.basename(FileAndExt[0]))
     mesh = bpy.data.meshes.new(TARGET_NAME)
@@ -877,7 +911,7 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
     del Vertex
     del Faces
     mesh.update()
-    
+
     print('texturing mesh...')
 
     ob_new = bpy.data.objects.new(TARGET_NAME, mesh)
@@ -894,7 +928,7 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
         with open(image_texture_filename):
             img = bpy.data.images.load(image_texture_filename)
             img.pack()
-            
+
             engine = bpy.context.scene.render.engine
             if engine in {'CYCLES', 'BLENDER_EEVEE', 'BLENDER_OPENGL'}:
                 material = create_cycles_material(bpy.context, img)
@@ -908,7 +942,7 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
 
     except IOError:
         print('Oh dear. Missing %s' %(image_texture_filename))
-    
+
     uvteller = 0
 
     #per face !
@@ -918,7 +952,7 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
             tc2 = Vector(((1.0 / LINE_SAMPLES) * (k + 1), 1.0 - (1.0 / LINES) * j))
             tc3 = Vector(((1.0 / LINE_SAMPLES) * (k + 1), 1.0 - (1.0 / LINES) * (j + 1)))
             tc4 = Vector(((1.0 / LINE_SAMPLES) * k, 1.0 - (1.0 / LINES) * (j + 1)))
-            
+
             bpy.data.objects[TARGET_NAME].data.uv_layers[0].data[uvteller].uv = tc1
             uvteller = uvteller + 1
             bpy.data.objects[TARGET_NAME].data.uv_layers[0].data[uvteller].uv = tc2
@@ -933,7 +967,7 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
     mesh_ob = bpy.context.object
     me = mesh_ob.data
     bm = bmesh.from_edit_mesh(me)
-    
+
     verts = [v for v in bm.verts if v.co[0] == 0.0 and v.co[1] == 0.0 and v.co[2] == 0.0]
     bmesh.ops.delete(bm, geom=verts, context="VERTS")
     bmesh.update_edit_mesh(me)
@@ -943,30 +977,30 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
     mesh_ob = bpy.context.object
     me = mesh_ob.data
     bm = bmesh.from_edit_mesh(me)
-    
+
     verts = [v for v in bm.verts if len(v.link_faces) == 0]
     bmesh.ops.delete(bm, geom=verts, context="VERTS")
     bmesh.update_edit_mesh(me)
 
     bpy.ops.object.editmode_toggle()
-    
+
     bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY')
     bpy.ops.object.mode_set(mode='OBJECT')
-    
+
     #mesh generation is done here, adding camera and text follows
 
     cam = bpy.data.cameras.new('Camera')
     cam.lens = 40
     cam.clip_start = 0.01
     cam_ob = bpy.data.objects.new('Cam-' + os.path.basename(FileAndExt[0]), cam)
-    
+
     bRoverVec = bRoverVec * 0.1
-    
+
     mat_loc = mathutils.Matrix.Translation(bRoverVec)
     mat_trans = mathutils.Matrix.Translation((0.0, 0.0, 0.15))
-    
-    cam_ob.matrix_world = mat_loc @ mat_trans    
-        
+
+    cam_ob.matrix_world = mat_loc @ mat_trans
+
     # Create Credit text
     trover = [ 'Spirit', 'Opportunity', 'Curiosity' ]
 
@@ -977,25 +1011,25 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
 
     # MSL provides Right Navcam Depth data
     s = list(os.path.basename(image_texture_filename))
-    if rover == 2 or rover == 1:
+    if rover == OPPORTUNITY or rover == SPIRIT:
         if s[23] == 'L' or s[23] == 'l':
             whichcam = 'Left'
         else:
             whichcam = 'Right'
 
-    if rover == 3:
+    if rover == CURIOSITY:
         if s[1]  == 'L' or s[1] == 'l':
             whichcam = 'Left'
         else:
             whichcam = 'Right'
 
     tagtext = trover[rover-1] + ' ' + whichcam +' Navcam Image at Sol ' + str(sol) + '\n' + str(date_object.strftime('%d %b %Y %H:%M:%S')) + ' UTC\nNASA / JPL-CALTECH / phaseIV'
-    
+
     bpy.ops.object.text_add(enter_editmode=True, location = (-0.02, -0.0185, -0.05)) #location = (-0.018, -0.0185, -0.05))
     bpy.ops.font.delete(type='PREVIOUS_WORD')
     bpy.ops.font.text_insert(text=str(tagtext))
     bpy.ops.object.editmode_toggle()
-    
+
     textSize = 0.001
     text_ob = bpy.context.view_layer.objects.active
     text_ob.scale = [textSize, textSize, textSize]
@@ -1003,26 +1037,26 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
     tempColl = find_collection(bpy.context, text_ob)
     theSolCollection.objects.link(text_ob)
     tempColl.objects.unlink(text_ob)
-    
+
     found = None
-    
+
     for i in range(len(bpy.data.materials)) :
         if bpy.data.materials[i].name == 'White text':
             mat = bpy.data.materials[i]
             found = True
     if not found:
         mat = create_named_material(bpy.context, 'White text')
-        
+
     text_ob.data.materials.append(mat)
     text_ob.parent = cam_ob
-    
+
     objloc = Vector(mesh_ob.location)
     rovloc = Vector(bRoverVec)
     distvec = rovloc - objloc
 
     expoint = obj.matrix_world.to_translation()+Vector((0.0, 0.0, -0.04-distvec.length*0.1))
     look_at(cam_ob, expoint)
-    
+
     theSolCollection.objects.link(cam_ob)
     bpy.context.scene.camera = cam_ob
     #bpy.context.scene.update()
@@ -1041,11 +1075,11 @@ def look_at(obj_camera, point):
 
 def draw(self, context):
     global popup_error
-    
+
     if(popup_error == 1):
         self.layout.label(text="Unable to retrieve NAVCAM texture image.")
         print("Unable to retrieve NAVCAM texture image.")
-    
+
     if(popup_error == 2):
         self.layout.label(text="Unable to retrieve NAVCAM depth image.")
         print("Unable to retrieve NAVCAM depth image.")
@@ -1063,7 +1097,7 @@ class NavcamToolsPanel(bpy.types.Panel):
     bl_label = "Mars Rover Import"
     bl_space_type = "VIEW_3D"
     bl_region_type = "TOOLS"
- 
+
     def draw(self, context):
         self.layout.operator("io.navcamdialog_operator")
 
