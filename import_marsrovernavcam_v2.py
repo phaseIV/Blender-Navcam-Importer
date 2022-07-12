@@ -1085,11 +1085,11 @@ def draw(self, context):
         print("Unable to retrieve NAVCAM depth image.")
 
     if(popup_error == 3):
-        self.layout.label(text="Navcam imagename has incorrect length.")
+        self.layout.label(text="Navcam imagename has incorrect length (should be 27 for MER or 36 for MSL).")
         print("Navcam imagename has incorrect length.")
 
     if(popup_error == 4):
-        self.layout.label(text="Not a valid Left Navcam imagename.")
+        self.layout.label(text="Not a valid Left Navcam imagename: should begin by 1N or 2N for MER, or by N for MSL.")
         print("Not a valid Left Navcam imagename.")
 
 
