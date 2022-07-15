@@ -323,7 +323,7 @@ def get_16bit_texture_image(rover, sol, imgname):
         s[11] = 'm'
         s[12] = 'r'
         s[13] = 'd'
-        s[25] = 'm  
+        s[25] = 'm'
 
     imagename = '%s' % "".join(s)
     imgfilename = os.path.join(local_data_dir, roverDataDir, 'sol%05d' %(sol), imagename )
@@ -375,7 +375,7 @@ def get_depth_image(rover, sol, imgname):
     xyzfilename = os.path.join(local_data_dir, roverDataDir, 'sol%05d' %(sol), xyzname )
 
     if os.path.isfile(xyzfilename):
-        print('xyz from cache: ', xyzfilename)
+        print('Loading xyz data from cache: ', xyzfilename)
         return xyzfilename
 
     retrievedir = os.path.join(local_data_dir, roverDataDir, 'sol%05d' %(sol) )
