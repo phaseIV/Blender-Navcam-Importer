@@ -59,7 +59,21 @@ The addon caches all downloaded data in Blender’s Temp directory. Texture imag
 
 Batch import works by pasting a single line with comma seperated image names into the addon popupmenu.
 
+## Color images
 Mars Rover Navcam images are grayscale only. Projecting color images might get implemented in the future.
+
+Pancam images are in greyscale, but being taken using different filter, it is possibile to "compose" them to get a "false colors" image, as described here: http://pancam.sese.asu.edu/pancam_instrument/projects_5.html :
+
+>  the most common filter combination is L2, L5 and L7, which correspond to wavelengths of 753, 535, and 432 nm, respectively. When these are not available, the filter with the shortest wavelength available is used for the blue channel, the longest available wavelength is used for the red channel, and the median wavelength is used for the green value.
+
+Filters and wavelengths (nm):
+- **L2	753** -  Longest (Red)
+- L3	673
+- L4	601
+- **L5	535** - Median (green)
+- L6	482
+- **L7	432** - Shortest (Blue)
+
 
 Recent Navcam image ID’s don’t work because the depth images are not yet available in PDS.  
 Check the following links for Navcam/Sol PDS release schedules:  
