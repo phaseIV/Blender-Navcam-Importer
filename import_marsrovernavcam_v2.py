@@ -80,7 +80,7 @@ def ReadNavcamString(inString, inFillBool, inRadBool):
         if(len(collString[i]) == 0): collString.pop(i)
 
     for i in range(0, len(collString)):
-        theString = os.path.splitext(collString[i].strip( ' ' ))[0].upper() // case insensitive
+        theString = os.path.splitext(collString[i].strip( ' ' ))[0].upper() # case insensitive
 
         if len(theString) == 27 or len(theString) == 36:
             pass
