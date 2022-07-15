@@ -15,8 +15,8 @@ from datetime import datetime
 
 bl_info = {
     "name": "Mars Rover NAVCAM Import",
-    "author": "Rob Haarsma (rob@captainvideo.nl)",
-    "version": (0, 2, 0),
+    "author": "Rob Haarsma (modded by Jumpjack)",
+    "version": (0, 2, 1),
     "blender": (2, 80, 0),
     "location": "File > Import > ...  and/or 3D Window Tools menu > Mars Rover NAVCAM Import",
     "description": "Creates Martian landscapes from Mars Rover Navcam images",
@@ -80,7 +80,7 @@ def ReadNavcamString(inString, inFillBool, inRadBool):
         if(len(collString[i]) == 0): collString.pop(i)
 
     for i in range(0, len(collString)):
-        theString = os.path.splitext(collString[i].strip( ' ' ))[0]
+        theString = os.path.splitext(collString[i].strip( ' ' ))[0].upper() // case insensitive
 
         if len(theString) == 27 or len(theString) == 36:
             pass
@@ -218,7 +218,7 @@ def tosol(rover, nameID):
     if rover == CURIOSITY:
         craft_time = nameID[4:13]
     if rover == OPPORTUNITY or rover == SPIRIT:
-        craft_time = nameID[2:11] # Warning: 2:10
+        craft_time = nameID[2:11] 
 
     s = int(craft_time)
     MSD = (s/88775.244) + 44795.9998
@@ -272,32 +272,33 @@ def get_texture_image(rover, sol, imgname):
             s[11] = 'e'
             s[12] = 'd'
             s[13] = 'n'
-            s[25] = 'm'  # Warning: product code is only 3 characters long; 4th character pertains to site number, coded in letter+number format
+            s[25] = 'm'  
         else:
             s[11] = 'e'
             s[12] = 'f'
             s[13] = 'f'
-            s[25] = 'm'  # Warning: product code is only 3 characters long; 4th character pertains to site number, coded in letter+number format
+            s[25] = 'm'  
 
     imagename = '%s' % "".join(s)
     imgfilename = os.path.join(local_data_dir, roverImageDir, '%05d' %(sol), imagename )
 
     if os.path.isfile(imgfilename):
-        print('tex from cache: ', imgfilename)
+        print('Loading texture from cache: ', imgfilename)
         return imgfilename
 
     retrievedir = os.path.join(os.path.dirname(local_data_dir), roverImageDir, '%05d' %( sol ) )
+    print ('Texture files are cached into ", retrievedir)
     if not os.path.exists(retrievedir):
         os.makedirs(retrievedir)
 
     localfile = imgfilename
 
     if rover == OPPORTUNITY or rover == SPIRIT:
-         remotefile = os.path.join(os.path.dirname(nasaimg_path), roverImageDir, '%03d' %(sol), imagename.upper() )
+        remotefile = os.path.join(os.path.dirname(nasaimg_path), roverImageDir, '%03d' %(sol), imagename.upper() )
     if rover == CURIOSITY:
         remotefile = os.path.join(os.path.dirname(pdsimg_path), roverImageDir, 'SOL%05d' %(sol), imagename )
 
-    print('downloading tex: ', remotefile)
+    print('Downloading texture data: ', remotefile)
 
     result = download_file(remotefile)
     if(result == False):
@@ -322,16 +323,17 @@ def get_16bit_texture_image(rover, sol, imgname):
         s[11] = 'm'
         s[12] = 'r'
         s[13] = 'd'
-        s[25] = 'm  '# Warning: product code is only 3 characters long; 4th character pertains to site number, coded in letter+number format
+        s[25] = 'm  
 
     imagename = '%s' % "".join(s)
     imgfilename = os.path.join(local_data_dir, roverDataDir, 'sol%05d' %(sol), imagename )
 
     if os.path.isfile(imgfilename):
-        print('rad from cache: ', imgfilename)
+        print('Loading 16 bit texture (rad) from cache: ', imgfilename)
         return imgfilename
 
     retrievedir = os.path.join(os.path.dirname(local_data_dir), roverDataDir, 'sol%05d' %( sol ) )
+    print ('16 bit texture files (rad) are cached into ", retrievedir)
     if not os.path.exists(retrievedir):
         os.makedirs(retrievedir)
 
@@ -342,7 +344,7 @@ def get_16bit_texture_image(rover, sol, imgname):
     if rover == CURIOSITY:
         remotefile = os.path.join(os.path.dirname(pdsimg_path), roverDataDir, 'SOL%05d' %(sol), imagename )
 
-    print('downloading rad: ', remotefile)
+    print('Downloading 16 bit texture (rad): ', remotefile)
 
     result = download_file(remotefile)
     if(result == False):
@@ -367,7 +369,7 @@ def get_depth_image(rover, sol, imgname):
         s[11] = 'x'
         s[12] = 'y'
         s[13] = 'l'
-        s[25] = 'm' # Warning: product code is only 3 characters long; 4th character pertains to site number, coded in letter+number format
+        s[25] = 'm' 
 
     xyzname = '%s' % "".join(s)
     xyzfilename = os.path.join(local_data_dir, roverDataDir, 'sol%05d' %(sol), xyzname )
@@ -377,6 +379,7 @@ def get_depth_image(rover, sol, imgname):
         return xyzfilename
 
     retrievedir = os.path.join(local_data_dir, roverDataDir, 'sol%05d' %(sol) )
+    print ('3d files (xyz) are cached into ", retrievedir)
     if not os.path.exists(retrievedir):
         os.makedirs(retrievedir)
 
@@ -765,7 +768,7 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
     FileAndPath = image_depth_filename
     FileAndExt = os.path.splitext(FileAndPath)
 
-    print('creating mesh...')
+    print('Creating mesh...')
 
     # Open the img label file (ascii label part)
     try:
@@ -842,7 +845,12 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
     meh = edit.find(b'LBLSIZE')
     f2.seek( meh + BYTES)
 
-    # Create a list of bands containing an empty list for each band
+    # Create a list of bands containing an empty list for each band.
+    # Each band contains a sequence of Float32 IEEE754 (4 bytes); byte order is specified in PDS label and Vicar label   
+    # at the beginning of the file.	   
+    # Band 0 = X, Band 1 = Y, Band 2 = Z.
+    # Band length = bytes_per_sample * lines * samples	= 4 * lines * samples
+	   
     bands = []
 
     # Read data for each band at a time
@@ -873,7 +881,7 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
 
     for j in range(0, LINES):
         for k in range(0, LINE_SAMPLES):
-            vec = Vector((float(bands[1][j][k]), float(bands[0][j][k]), float(-bands[2][j][k])))
+            vec = Vector((float(bands[1][j][k]), float(bands[0][j][k]), float(-bands[2][j][k])))  # Rover Z axis points downwards, hence invert Z
             vec = vec*0.1
             Vertex.append(vec)
 
@@ -912,7 +920,7 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
     del Faces
     mesh.update()
 
-    print('texturing mesh...')
+    print('Texturing mesh...')
 
     ob_new = bpy.data.objects.new(TARGET_NAME, mesh)
     ob_new.data = mesh
@@ -1061,7 +1069,7 @@ def create_mesh_from_depthimage(rover, sol, image_depth_filename, image_texture_
     bpy.context.scene.camera = cam_ob
     #bpy.context.scene.update()
 
-    print ('mesh generation complete.')
+    print ('Mesh generation complete. Note: you must turn on rendering or preview to see texture.')
 
 
 def look_at(obj_camera, point):
@@ -1085,12 +1093,12 @@ def draw(self, context):
         print("Unable to retrieve NAVCAM depth image.")
 
     if(popup_error == 3):
-        self.layout.label(text="Navcam imagename has incorrect length (should be 27 for MER or 36 for MSL).")
-        print("Navcam imagename has incorrect length.")
+        self.layout.label(text="Navcam imagename has incorrect length (should be 27 for MER,  36 for MSL).")
+        print("Navcam imagename has incorrect length (should be 27 for MER,  36 for MSL).")
 
     if(popup_error == 4):
-        self.layout.label(text="Not a valid Left Navcam imagename: should begin by 1N or 2N for MER, or by N for MSL.")
-        print("Not a valid Left Navcam imagename.")
+        self.layout.label(text="Not a valid Left Navcam imagename: should begin by 1N or 2N for MER, by N for MSL.")
+        print("Not a valid Left Navcam imagename: should begin by 1N or 2N for MER, by N for MSL.")
 
 
 class NavcamToolsPanel(bpy.types.Panel):
