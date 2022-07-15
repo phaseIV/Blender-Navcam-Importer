@@ -12,14 +12,18 @@ import time
 import re
 from datetime import datetime
 
+# 0.3.0 by Jumpjack
+# Added support for navcam, rear hazcam and front hazcam for MER1/MER2
+# Added support for alternate texture (EFF or FFL)
+# Added comments/explanations on naming convention
 
 bl_info = {
     "name": "Mars Rover NAVCAM Import",
     "author": "Rob Haarsma (modded by Jumpjack)",
-    "version": (0, 2, 2),
+    "version": (0, 3, 0),
     "blender": (2, 80, 0),
     "location": "File > Import > ...  and/or 3D Window Tools menu > Mars Rover NAVCAM Import",
-    "description": "Creates Martian landscapes from Mars Rover Navcam images",
+    "description": "Creates Martian landscapes from Mars Rover Navcam/Pancam images",
     "warning": "This script produces high poly meshes and saves downloaded data in Temp directory",
     "wiki_url": "https://github.com/phaseIV/Blender-Navcam-Importer",
     "tracker_url": "https://github.com/phaseIV/Blender-Navcam-Importer/issues",
@@ -29,7 +33,7 @@ bl_info = {
 pdsimg_path = 'https://pds-imaging.jpl.nasa.gov/data/'
 # mirror: https://pdsimage2.wr.usgs.gov/data/mer2no/mer2no_0xxx/data/sol1869/rdr/
 
-nasaimg_path = 'https://mars.nasa.gov/'  # obsolete, look into:
+nasaimg_path = 'https://mars.nasa.gov/'  
 # https://pds-imaging.jpl.nasa.gov/data/mer2-m-navcam-5-xyz-ops-v1.0/mer2no_0xxx/data/
 # https://pds-imaging.jpl.nasa.gov/data/mer/mer2no_0xxx/data/
 
@@ -49,7 +53,7 @@ CURIOSITY = 3
 
 class NavcamDialogOperator(bpy.types.Operator):
     bl_idname = "io.navcamdialog_operator"
-    bl_label = "Enter Rover Navcam image ID"
+    bl_label = "Enter Rover Navcam/Pancam image ID"
 
     navcam_string: bpy.props.StringProperty(name="Image Name", default='')
     fillhole_bool: bpy.props.BoolProperty(name="Fill Gaps (draft)", default = True)
@@ -69,6 +73,7 @@ def ReadNavcamString(inString, inFillBool, inRadBool):
     global local_data_dir, roverDataDir, roverImageDir, popup_error, curve_minval, curve_maxval
 
     if inString=="": return
+    print ('------------inString=',inString)
 
     time_start = time.time()
 
@@ -90,14 +95,65 @@ def ReadNavcamString(inString, inFillBool, inRadBool):
             return
 
         rover = None
+        roverCamera = None
 
+        print('-----------Processing input ',   theString);
         if theString.startswith( 'N' ):
             rover = CURIOSITY
-        if theString.startswith( '2N' ):
+            
+            
+        if theString.startswith( '2N' ) :
             rover = SPIRIT
-        if theString.startswith( '1N' ):
+            roverCamera == 'navcam'
+            roverDataDir = 'mer/mer2no_0xxx/data/'  
+            roverImageDir = 'mer/gallery/all/2/n/'  
+            print ('Detected image from navcam')
+        if theString.startswith( '2P' ) :
+            rover = SPIRIT
+            roverCamera == 'pancam'
+            roverDataDir = 'mer/mer2po_0xxx/data/'  
+            roverImageDir = 'mer/gallery/all/2/p/'  
+            print ('Detected image from PANCAM')
+        if theString.startswith( '2F' ) :
+            rover = SPIRIT
+            roverCamera == 'fhazcam'
+            roverDataDir = 'mer/mer2ho_0xxx/data/'  
+            roverImageDir = 'mer/gallery/all/2/h/'  
+            print ('Detected image from FRONT HAZCAM')
+        if theString.startswith( '2R' ) :
+            rover = SPIRIT
+            roverCamera == 'rhazcam'
+            roverDataDir = 'mer/mer2ho_0xxx/data/'  
+            roverImageDir = 'mer/gallery/all/2/h/'  
+            print ('Detected image from REAR HAZCAM')
+            
+            
+        if theString.startswith( '1N' ) :
             rover = OPPORTUNITY
-
+            roverCamera == 'navcam'
+            roverDataDir = 'mer/mer1no_0xxx/data/'  
+            roverImageDir = 'mer/gallery/all/1/n/'  
+            print ('Detected image from navcam')
+        if theString.startswith( '1P' ) :
+            rover = OPPORTUNITY
+            roverCamera == 'pancam'
+            roverDataDir = 'mer/mer1po_0xxx/data/'  
+            roverImageDir = 'mer/gallery/all/1/p/'  
+            print ('Detected image from PANCAM')
+        if theString.startswith( '1F' ) :
+            rover = OPPORTUNITY
+            roverCamera == 'fhazcam'
+            roverDataDir = 'mer/mer1ho_0xxx/data/'  
+            roverImageDir = 'mer/gallery/all/1/h/'  
+            print ('Detected image from FRONT HAZCAM')
+        if theString.startswith( '1R' ) :
+            rover = OPPORTUNITY
+            roverCamera == 'rhazcam'
+            roverDataDir = 'mer/mer1ho_0xxx/data/'  
+            roverImageDir = 'mer/gallery/all/1/h/'  
+            print ('Detected image from REAR HAZCAM')
+            
+            
         if rover == None:
             popup_error = 4
             bpy.context.window_manager.popup_menu(draw, title="Name Error", icon='ERROR')
@@ -105,12 +161,10 @@ def ReadNavcamString(inString, inFillBool, inRadBool):
 
         sol_ref = tosol(rover, theString)
 
-        if rover == SPIRIT:
-            roverDataDir = 'mer/mer2no_0xxx/data/'  # Now 'spirit/mer2no_0xxx/data/'
-            roverImageDir = 'mer/gallery/all/2/n/'  # Now 'spirit/mer2no_0xxx/browse/' ?
-        if rover == OPPORTUNITY:
-            roverDataDir = 'mer/mer1no_0xxx/data/'  # Now 'opportunity/mer2no_0xxx/data/'
-            roverImageDir = 'mer/gallery/all/1/n/'  # Now 'opportunity/mer2no_0xxx/browse/' ?
+        print ('----------Assigned:  rover=',rover, SPIRIT, OPPORTUNITY, CURIOSITY)
+        print ('----------Assigned:  sol_ref=',sol_ref)
+
+
         if rover == CURIOSITY:
             if sol_ref < 1870:
                 roverDataDir = 'msl/MSLNAV_1XXX/DATA_V1/'
@@ -119,13 +173,17 @@ def ReadNavcamString(inString, inFillBool, inRadBool):
                 roverDataDir = 'msl/MSLNAV_1XXX/DATA/'
                 roverImageDir = 'msl/MSLNAV_1XXX/EXTRAS/FULL/'
 
+        print ('----------Assigned:  roverDataDir=',roverDataDir)
+        print ('----------Assigned:  roverImageDir=',roverImageDir)
+
+
         print( '\nConstructing mesh %d/%d, sol %d, name %s' %( i + 1, len(collString), sol_ref, theString) )
 
         curve_minval = 0.0
         curve_maxval = 1.0
 
         if inRadBool:
-            image_16bit_texture_filename = get_16bit_texture_image(rover, sol_ref, theString)
+            image_16bit_texture_filename = get_16bit_texture_image(rover, sol_ref, theString, roverImageDir)
             image_texture_filename = convert_to_png(image_16bit_texture_filename)
         else:
             image_texture_filename = get_texture_image(rover, sol_ref, theString)
@@ -205,11 +263,35 @@ def tosol(rover, nameID):
     # 11-13: XYL       = XYL product
     # 14-15: B0        = site
     # 16-17: HM        = drive/position w.r.t site
-    # 18-22: P0755     = sequence
+    # 18-22: P0755     = sequence (“P”  -  PMA & Remote Sensing instr.  (Pancam, Navcam, Hazcam, MI, Mini-TES) 
     # 23:    L         = left
     # 24:    0         = filter
     # 25:    M         = Author (MIPL)
     # 26:    2         = Product version
+
+# Sequence details:
+# ( https://pds-imaging.jpl.nasa.gov/data/mer/opportunity/mer1ho_0xxx/document/CAMSIS_latest.PDF )
+# seq    =    (1 alpha character plus 4 integers)  Sequence identifier.  Denotes a group of related 
+# commands used as keys for the Ops processing.   
+#  
+# Valid values for character (position 1) in field: 
+#  
+# “C”  -  Cruise 
+# “D”  -  IDD & RAT 
+# “E”  -  Engineering 
+# “F”  -  Flight Software (Seq rejected) 
+# “G”  -  (spare) 
+# “K”  -  (spare) 
+# “M”  -  Master (Surface only) 
+# “N”  -  In-Situ instr. (APXS, MB, MI)  
+# “P”  -  PMA & Remote Sensing instr.  (Pancam, Navcam, Hazcam, MI, Mini-TES) 
+# “R”  -  Rover Driving 
+# “S”  -  Submaster 
+# “T”  -  Test 
+# “W” -  Seq triggered by a Commun. Window 
+# “X”  -  Contingency 
+# “Y”  -  (spare) 
+# “Z”  -  SCM Seq’s 
 
     # origin: https://github.com/natronics/MSL-Feed/blob/master/nasa.py
     # function hacked to return sol from image filename
@@ -267,7 +349,7 @@ def get_texture_image(rover, sol, imgname):
     # Reference Pixels EDR “ERP” 
     # Histogram EDR “EHG”
 
-        if s[18] == 'F' or s[18] == 'f':
+        if s[18] == 'F' or s[18] == 'f':  # sequence (“P”  -  PMA & Remote Sensing instr.  (Pancam, Navcam, Hazcam, MI, Mini-TES) 
             #mer downsampled??
             s[11] = 'e'
             s[12] = 'd'
@@ -280,17 +362,36 @@ def get_texture_image(rover, sol, imgname):
             s[25] = 'm'  
 
     imagename = '%s' % "".join(s)
+    print ('local_data_dir :', local_data_dir)
+    print ('roverImageDir :', roverImageDir)
+    print ('sol :', sol )
+    print ('imagename :', imagename)
     imgfilename = os.path.join(local_data_dir, roverImageDir, '%05d' %(sol), imagename )
-
+   
+    print('Looking for EFF texture in cache: ', imgfilename)
     if os.path.isfile(imgfilename):
-        print('Loading texture from cache: ', imgfilename)
+        print('Loading EFF texture from cache: ', imgfilename)
         return imgfilename
-
+    else :
+      s[11] = 'f'
+      s[12] = 'f'
+      s[13] = 'l'
+      s[25] = 'm'  
+      imagename2 = '%s' % "".join(s)
+      imgfilename2 = os.path.join(local_data_dir, roverImageDir, '%05d' %(sol), imagename2 )
+      print('EFF texture not found; looking for alternative (FFL) texture in cache: ', imgfilename2)
+      if os.path.isfile(imgfilename2):
+          print('Loading FFL texture from cache: ', imgfilename2)
+          return imgfilename2
+    
+    # Nothing in cache: try downloading...
+    
     retrievedir = os.path.join(os.path.dirname(local_data_dir), roverImageDir, '%05d' %( sol ) )
     print ('Texture files are cached into ', retrievedir)
     if not os.path.exists(retrievedir):
         os.makedirs(retrievedir)
 
+   # Try first with EFF texture:
     localfile = imgfilename
 
     if rover == OPPORTUNITY or rover == SPIRIT:
@@ -298,13 +399,30 @@ def get_texture_image(rover, sol, imgname):
     if rover == CURIOSITY:
         remotefile = os.path.join(os.path.dirname(pdsimg_path), roverImageDir, 'SOL%05d' %(sol), imagename )
 
-    print('Downloading texture data: ', remotefile)
+    print('Trying to download texture data: ', remotefile)
 
     result = download_file(remotefile)
     if(result == False):
-        return None
-
+      # No EFF texture, try with FFL:
+      print ('Cannot find EFF texture: ', remotefile)
+      localfile = imgfilename2  
+      if rover == OPPORTUNITY or rover == SPIRIT:
+          remotefile = os.path.join(os.path.dirname(nasaimg_path), roverImageDir, '%03d' %(sol), imagename2.upper() )
+      if rover == CURIOSITY:
+          remotefile = os.path.join(os.path.dirname(pdsimg_path), roverImageDir, 'SOL%05d' %(sol), imagename2 )
+  
+      print('Trying to download alternative (FFL) texture data: ', remotefile)
+      
+      result = download_file(remotefile)
+      if(result == False):
+         print ('Cannot find texture: ', remotefile)
+         ShowMessageBox('Sorry, cant find texture ' + remotefile, 'TEXTURE ERROR')
+         return None
+      else :
+         imgfilename = imgfilename2
+    
     if os.path.isfile(localfile):
+        print ('Texture file successfully downloaded: ',imgfilename) 
         return imgfilename
 
 
@@ -1125,6 +1243,13 @@ def unregister():
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
     bpy.utils.unregister_class(NavcamToolsPanel)
 
+def ShowMessageBox(message = "", title = "Message Box", icon = 'INFO'):
 
+    def draw(self, context):
+        self.layout.label(text=message)
+
+    bpy.context.window_manager.popup_menu(draw, title = title, icon = icon)
+    
+    
 if __name__ == "__main__":
     register()
