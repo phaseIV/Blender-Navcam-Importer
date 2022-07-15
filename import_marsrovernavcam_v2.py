@@ -16,7 +16,7 @@ from datetime import datetime
 bl_info = {
     "name": "Mars Rover NAVCAM Import",
     "author": "Rob Haarsma (modded by Jumpjack)",
-    "version": (0, 2, 1),
+    "version": (0, 2, 2),
     "blender": (2, 80, 0),
     "location": "File > Import > ...  and/or 3D Window Tools menu > Mars Rover NAVCAM Import",
     "description": "Creates Martian landscapes from Mars Rover Navcam images",
@@ -287,7 +287,7 @@ def get_texture_image(rover, sol, imgname):
         return imgfilename
 
     retrievedir = os.path.join(os.path.dirname(local_data_dir), roverImageDir, '%05d' %( sol ) )
-    print ('Texture files are cached into ", retrievedir)
+    print ('Texture files are cached into ', retrievedir)
     if not os.path.exists(retrievedir):
         os.makedirs(retrievedir)
 
@@ -333,7 +333,7 @@ def get_16bit_texture_image(rover, sol, imgname):
         return imgfilename
 
     retrievedir = os.path.join(os.path.dirname(local_data_dir), roverDataDir, 'sol%05d' %( sol ) )
-    print ('16 bit texture files (rad) are cached into ", retrievedir)
+    print ('16 bit texture files (rad) are cached into ', retrievedir)
     if not os.path.exists(retrievedir):
         os.makedirs(retrievedir)
 
@@ -379,7 +379,7 @@ def get_depth_image(rover, sol, imgname):
         return xyzfilename
 
     retrievedir = os.path.join(local_data_dir, roverDataDir, 'sol%05d' %(sol) )
-    print ('3d files (xyz) are cached into ", retrievedir)
+    print ('3d files (xyz) are cached into ', retrievedir)
     if not os.path.exists(retrievedir):
         os.makedirs(retrievedir)
 
