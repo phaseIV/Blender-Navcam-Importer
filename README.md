@@ -3,7 +3,7 @@ Addon for Blender that creates Martian surfaces from Mars Rover NAVCAM images.
 
 ![Curiosity Sol 1051](http://i.imgur.com/DhUrzPi.jpg)
 
-See a movie here: https://vimeo.com/160405895
+See a movie here: https://www.youtube.com/watch?v=kTQzdlXC2BY (https://vimeo.com/160405895 is offline)
 
 ## Introduction
 For autonomous driving on Mars every rover is equipped with a set of (Left and Right) Navigation camera's. From the photo's made with these camera's a depth map is computed which is used by the rover to avoid collisions with rocks or other obstacles. These depth maps, which are basically digitized Martian landscapes, get transmitted back to earth with all other obtained data and after a four month period they appear online in the [Planetary Data System Imaging](http://pds-imaging.jpl.nasa.gov) archive from NASA.
